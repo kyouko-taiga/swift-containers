@@ -110,7 +110,7 @@ public final class MemoryArena<Element> {
     guard self ~= pointer
       else { return }
 
-    pointer.deallocate()
+    pointer.deinitialize(count: 1)
 
     let distance = buffer.baseAddress!.distance(to: pointer)
     let index = distance / 32
