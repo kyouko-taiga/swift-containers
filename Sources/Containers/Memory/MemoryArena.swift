@@ -107,7 +107,7 @@ public final class MemoryArena<Element> {
   /// - Parameter pointer: The pointer to deallocate. `pointer` must not be initialized or
   ///   `Element` must be a trivial type.
   public func deallocate(_ pointer: UnsafeMutablePointer<Element>) {
-    guard isInBounds(pointer)
+    guard self ~= pointer
       else { return }
 
     pointer.deallocate()
@@ -117,11 +117,11 @@ public final class MemoryArena<Element> {
     ledger[index] |= 1 &<< (distance % 32)
   }
 
-  /// Checks whether the given pointer lies within the bounds of the arena's buffer.
-  private func isInBounds(_ pointer: UnsafeMutablePointer<Element>) -> Bool {
-    guard let base = buffer.baseAddress
+  /// Returns whether a pointer lies within the bounds of the given arena.
+  public static func ~= (arena: MemoryArena, pointer: UnsafeMutablePointer<Element>) -> Bool {
+    guard let base = arena.buffer.baseAddress
       else { return false }
-    return base.distance(to: pointer) <= buffer.count
+    return base.distance(to: pointer) <= arena.buffer.count
   }
 
 }
