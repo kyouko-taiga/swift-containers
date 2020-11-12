@@ -11,9 +11,11 @@
 /// repurpose individual chunks.
 ///
 ///     let arena = MemoryArena<String>(capacity: 1024)
-///     if let p = arena.allocate() {
-///       p.initialize(to: "Hello, World!")
-///       p.deinitialize(count: 1)
+///     if let p = arena.allocate(initilizingWith: { p in
+///       p.initialize(to: "Hello")
+///     }) {
+///       p.pointee += ", World!"
+///       print(p.pointee)
 ///       arena.deallocate(p)
 ///     }
 ///
@@ -37,6 +39,10 @@ public final class MemoryArena<Element> {
   }
 
   deinit {
+    for pointer in self {
+      pointer.deinitialize(count: 1)
+    }
+
     buffer.deallocate()
     ledger.deallocate()
   }
@@ -47,11 +53,18 @@ public final class MemoryArena<Element> {
   /// The arena's availability ledger.
   private let ledger: UnsafeMutableBufferPointer<UInt32>
 
-  /// Returns a pointer to an uninitialized memory region large enough to fit a single `Element`.
+  /// Allocates the memory of a single `Element` instance and initializes it the given closure.
   ///
-  /// - Important: Do **not** deallocate arena pointers outside of the arena; attempting to do so
-  ///   so will result in undefined behavior. Use the arena's `deallocate(:)` method instead.
-  public func allocate() -> UnsafeMutablePointer<Element>? {
+  /// - Parameter initializer: A closure that accepts an uninitialized pointer to element and
+  ///   initializes it.
+  /// - Returns: An initialized pointer to `Element`, or `nil` if the arena ran out of memory.
+  ///
+  /// - Important: Do **not** deinitialize nor deallocate arena pointers outside of the arena;
+  ///   attempting to do so so will result in undefined behavior. Use the arena's `deallocate(:)`
+  ///   method instead.
+  public func allocate(
+    initilizingWith initializer: (UnsafeMutablePointer<Element>) throws -> Void
+  ) rethrows -> UnsafeMutablePointer<Element>? {
     guard let base = buffer.baseAddress
       else { return nil }
 
@@ -69,7 +82,13 @@ public final class MemoryArena<Element> {
           mask = mask &>> 1
         }
 
-        return ptr
+        do {
+          try initializer(ptr)
+          return ptr
+        } catch {
+          ledger[i] |= bitset & UInt32(bitPattern: -Int32(bitPattern: bitset))
+          throw error
+        }
       }
     }
 
@@ -87,6 +106,8 @@ public final class MemoryArena<Element> {
   public func deallocate(_ pointer: UnsafeMutablePointer<Element>) {
     guard isInBounds(pointer)
       else { return }
+
+    pointer.deallocate()
 
     let distance = buffer.baseAddress!.distance(to: pointer)
     let index = distance / 32
