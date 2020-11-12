@@ -24,6 +24,9 @@
 /// is deallocated at once, it is safe to create cyclic references between the objects it contains.
 public final class MemoryArena<Element> {
 
+  /// Creates a new arena.
+  ///
+  /// - Parameter capacity: The maximum number `Element`'s instances the arena can hold.
   public init(capacity: Int = 32) {
     buffer = .allocate(capacity: capacity)
     ledger = .allocate(capacity: (capacity + 31) / 32)
