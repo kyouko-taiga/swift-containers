@@ -30,6 +30,7 @@ public final class MemoryArena<Element> {
   public init(capacity: Int = 32) {
     buffer = .allocate(capacity: capacity)
     ledger = .allocate(capacity: (capacity + 31) / 32)
+    top = buffer.baseAddress
 
     for i in 0 ..< ledger.count {
       let k = (i + 1) * 32 - capacity
@@ -53,6 +54,9 @@ public final class MemoryArena<Element> {
   /// The arena's internal buffer.
   private let buffer: UnsafeMutableBufferPointer<Element>
 
+  /// A pointer to the next available location in the arena's buffer.
+  private var top: UnsafeMutablePointer<Element>?
+
   /// The arena's availability ledger.
   private let ledger: UnsafeMutableBufferPointer<UInt32>
 
@@ -71,6 +75,18 @@ public final class MemoryArena<Element> {
     guard let base = buffer.baseAddress
       else { return nil }
 
+    // Fast path, O(1): attempt to allocate at top of the memory stack.
+    let distance = base.distance(to: top!)
+    if distance < buffer.count {
+      let address = top!
+      let index = distance / 32
+      ledger[index] &= ~(1 &<< (distance % 32))
+
+      self.top = top!.successor()
+      return address
+    }
+
+    // Slow path, O(n): The top pointer is at the end of the buffer; search for a free space.
     for i in 0 ..< ledger.count {
       let bitset = ledger[i]
       var mask = bitset & UInt32(bitPattern: -Int32(bitPattern: bitset))
@@ -110,11 +126,24 @@ public final class MemoryArena<Element> {
     guard self ~= pointer
       else { return }
 
+    // Deinitializer the pointer.
     pointer.deinitialize(count: 1)
 
-    let distance = buffer.baseAddress!.distance(to: pointer)
-    let index = distance / 32
-    ledger[index] |= 1 &<< (distance % 32)
+    // Update the ledger.
+    var distance = buffer.baseAddress!.distance(to: pointer)
+    ledger[distance / 32] |= 1 &<< (distance % 32)
+
+    // Update the top pointer.
+    guard pointer == top!.predecessor()
+      else { return }
+
+    while distance >= 0 {
+      guard ledger[distance / 32] & (1 &<< (distance % 32)) != 0
+        else { break }
+
+      distance -= 1
+      top = top!.predecessor()
+    }
   }
 
   /// Returns whether a pointer lies within the bounds of the given arena.
