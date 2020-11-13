@@ -135,6 +135,10 @@ public final class MemoryArena<Element> {
   }
 
   /// Returns whether a pointer lies within the bounds of the given arena.
+  ///
+  /// - Parameters:
+  ///   - pool: The arena in which the pointer should be contained.
+  ///   - pointer: The pointer to check.
   public static func ~= (arena: MemoryArena, pointer: UnsafeMutablePointer<Element>) -> Bool {
     guard let base = arena.buffer.baseAddress
       else { return false }
