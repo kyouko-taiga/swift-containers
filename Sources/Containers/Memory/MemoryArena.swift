@@ -123,14 +123,19 @@ public final class MemoryArena<Element> {
   /// - Parameter pointer: The pointer to deallocate. `pointer` must not be initialized or
   ///   `Element` must be a trivial type.
   public func deallocate(_ pointer: UnsafeMutablePointer<Element>) {
+    // Check that the pointer is in bounds.
     guard self ~= pointer
+      else { return }
+
+    // Check that the pointer is indeed allocated.
+    var distance = buffer.baseAddress!.distance(to: pointer)
+    guard ledger[distance / 32] & (1 &<< (distance % 32)) != 0
       else { return }
 
     // Deinitializer the pointer.
     pointer.deinitialize(count: 1)
 
     // Update the ledger.
-    var distance = buffer.baseAddress!.distance(to: pointer)
     ledger[distance / 32] |= 1 &<< (distance % 32)
 
     // Update the top pointer.
