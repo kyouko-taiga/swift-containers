@@ -81,7 +81,7 @@ public final class MemoryArena<Element> {
     // Slow path, O(n): The top pointer is at the end of the buffer; search for a free space.
     for i in 0 ..< ledger.count {
       let bitset = ledger[i]
-      var mask = bitset & UInt32(bitPattern: -Int32(bitPattern: bitset))
+      var mask = bitset & UInt32(bitPattern: 0 &- Int32(bitPattern: bitset))
 
       if mask != 0 {
         ledger[i] &= ~mask
@@ -115,7 +115,7 @@ public final class MemoryArena<Element> {
 
     // Check that the pointer is indeed allocated.
     var distance = buffer.baseAddress!.distance(to: pointer)
-    guard ledger[distance / 32] & (1 &<< (distance % 32)) != 0
+    guard ledger[distance / 32] & (1 &<< (distance % 32)) == 0
       else { return }
 
     // Update the ledger.
