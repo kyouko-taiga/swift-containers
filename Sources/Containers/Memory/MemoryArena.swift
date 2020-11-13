@@ -126,6 +126,14 @@ public final class MemoryArena<Element> {
 
 }
 
+extension MemoryArena where Element: _AnyTrivial {
+
+  public func allocate() -> UnsafeMutablePointer<Element>? {
+    return allocate(initilizingWith: { p in () })
+  }
+
+}
+
 extension MemoryArena: Collection {
 
   public var startIndex: Int {
